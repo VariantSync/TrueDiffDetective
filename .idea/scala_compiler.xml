@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ScalaCompilerConfiguration">
+    <profile name="sbt 1" modules="truediffdetective_6110" />
+    <profile name="sbt 2" modules="TrueDiffDetective">
+      <parameters>
+        <parameter value="-Ymacro-annotations" />
+      </parameters>
+    </profile>
+  </component>
+</project>
