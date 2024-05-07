@@ -37,10 +37,20 @@ object Main {
       )
     }
     {
-      println("TreeNode: ")
+      println("StringTreeNode: ")
       compareAndPrintEditScript(
         StringTreeNode("A", Seq(StringTreeNode("B", Seq(StringTreeNode("C", Seq()))))),
         StringTreeNode("A", Seq(StringTreeNode("B", Seq(StringTreeNode("C", Seq(StringTreeNode("D", Seq())))))))
+      )
+      println("IntegerTreeNode: ")
+      compareAndPrintEditScript(
+        IntegerTreeNode(1, Seq(IntegerTreeNode(2, Seq(IntegerTreeNode(3, Seq()))))),
+        IntegerTreeNode(1, Seq(IntegerTreeNode(2, Seq(IntegerTreeNode(3, Seq(IntegerTreeNode(4, Seq())))))))
+      )
+      println("TreeNode: ")
+      compareAndPrintEditScript(
+        IntegerTreeNode(1, Seq(StringTreeNode("A", Seq()))),
+        IntegerTreeNode(1, Seq(StringTreeNode("A", Seq(IntegerTreeNode(3, Seq(StringTreeNode("B", Seq())))))))
       )
     }
   }
