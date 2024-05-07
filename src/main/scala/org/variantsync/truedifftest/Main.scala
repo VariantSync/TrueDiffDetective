@@ -1,6 +1,11 @@
 package org.variantsync.truedifftest
 
+import org.variantsync.diffdetective.variation.diff.parse.VariationDiffParseOptions
+import org.variantsync.diffdetective.variation.diff.{Time, VariationDiff}
+import org.variantsync.truediffdetective.TrueDiffDetective
 import truediff.Diffable
+
+import java.nio.file.Path
 
 object Main {
   private def compareAndPrintEditScript(src: Diffable, dest: Diffable): Unit = {
@@ -51,6 +56,16 @@ object Main {
       compareAndPrintEditScript(
         IntegerTreeNode(1, Seq(StringTreeNode("A", Seq()))),
         IntegerTreeNode(1, Seq(StringTreeNode("A", Seq(IntegerTreeNode(3, Seq(StringTreeNode("B", Seq())))))))
+      )
+    }
+    {
+      println("VariationNodeTreeWrapper: ")
+      val d = VariationDiff.fromFile(Path.of("resources/test.diff"), VariationDiffParseOptions.Default)
+      val before = d.project(Time.BEFORE)
+      val after = d.project(Time.AFTER)
+      compareAndPrintEditScript(
+        TrueDiffDetective.wrapVariationTreeNode(before.root()),
+        TrueDiffDetective.wrapVariationTreeNode(after.root()),
       )
     }
   }

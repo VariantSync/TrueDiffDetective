@@ -1,0 +1,10 @@
+ #ifdef A
+   foo();
+-#else
+-  #ifdef B
++  bar();
++#endif
++#if B && (!A || C)
+   baz();
+-#endif
+ #endif
