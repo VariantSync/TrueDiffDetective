@@ -36,5 +36,12 @@ object Main {
         Add(Num(1), Add(Num(2), Add(Num(3), Num(4))))
       )
     }
+    {
+      println("TreeNode: ")
+      compareAndPrintEditScript(
+        StringTreeNode("A", Seq(StringTreeNode("B", Seq(StringTreeNode("C", Seq()))))),
+        StringTreeNode("A", Seq(StringTreeNode("B", Seq(StringTreeNode("C", Seq(StringTreeNode("D", Seq())))))))
+      )
+    }
   }
 }
