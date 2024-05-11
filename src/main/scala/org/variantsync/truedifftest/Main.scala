@@ -1,7 +1,9 @@
 package org.variantsync.truedifftest
 
-import org.variantsync.diffdetective.variation.diff.parse.VariationDiffParseOptions
+import org.variantsync.diffdetective.show.Show
+import org.variantsync.diffdetective.show.engine.GameEngine
 import org.variantsync.diffdetective.variation.diff.{Time, VariationDiff}
+import org.variantsync.diffdetective.variation.diff.parse.VariationDiffParseOptions
 import org.variantsync.truediffdetective.TrueDiffDetective
 import truediff.Diffable
 
@@ -26,7 +28,7 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     {
-      println("Manual: ")
+      println("Exp Manual: ")
       import manual._
       compareAndPrintEditScript(
         Add(Num(1), Add(Num(2), Num(3))),
@@ -34,7 +36,7 @@ object Main {
       )
     }
     {
-      println("Macros: ")
+      println("Exp Macros: ")
       import macros._
       compareAndPrintEditScript(
         Add(Num(1), Add(Num(2), Num(3))),
@@ -67,6 +69,15 @@ object Main {
         TrueDiffDetective.wrapVariationTreeNode(before.root()),
         TrueDiffDetective.wrapVariationTreeNode(after.root()),
       )
+    }
+    {
+      println("apply edits to VariationTree")
+      val d = VariationDiff.fromFile(Path.of("resources/test.diff"), VariationDiffParseOptions.Default)
+      val before = d.project(Time.BEFORE)
+      val after = d.project(Time.AFTER)
+
+      val result = TrueDiffDetective.compare(before, after)
+      GameEngine.showAndAwaitAll(Show.tree(before, "before"), Show.tree(after, "after"), Show.tree(result, "before with applied edits"))
     }
   }
 }
