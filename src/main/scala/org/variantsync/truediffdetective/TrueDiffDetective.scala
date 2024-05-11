@@ -1,6 +1,5 @@
 package org.variantsync.truediffdetective
 
-import org.apache.commons.collections4.trie
 import org.variantsync.diffdetective.diff.text.DiffLineNumber
 import org.variantsync.diffdetective.variation.diff._
 import org.variantsync.diffdetective.variation.tree.{VariationNode, VariationTree, VariationTreeNode}
@@ -11,43 +10,30 @@ import truediff.DiffableList
 import scala.collection.mutable.ListBuffer
 
 object TrueDiffDetective {
-  def wrapVariationNode[T <: VariationNode[T, L], L <: Label](variationNode: VariationNode[T, L]): VariationWrapper = {
-    val tdd = new TrueDiffDetective[T, L]()
-    tdd.wrapVariationNode(variationNode)
-  }
-
-  def compare[T <: VariationNode[T, L], L <: Label](before: VariationTree[L], after: VariationTree[L]): VariationDiff[L] = {
-    val tdd = new TrueDiffDetective[T, L]()
-    tdd.compare(before, after)
-  }
-}
-
-class TrueDiffDetective[T <: VariationNode[T, L], L <: Label] {
-  private val uriToNode = new trie.PatriciaTrie[VariationNode[T, L]]()
-
-  private def getNodeFromURI(uri: URI): T = {
-    uriToNode.get(uri.toString) match {
+  private def getNodeFromURI[T <: VariationNode[T, L], L <: Label](uri: URI): T = {
+    val variationNodeURI: VariationNodeURI[L, T] = uri match {
+      case i: VariationNodeURI[_, _] => i.asInstanceOf[VariationNodeURI[L, T]]
+      case _ => ???
+    }
+    variationNodeURI.variationNode match {
       case projection: Projection[_] => projection.asInstanceOf[T]
       case node: VariationTreeNode[_] => val projection = DiffNode.unchanged(node.asInstanceOf[VariationTreeNode[L]]).projection(Time.AFTER).asInstanceOf[T]
-        uriToNode.put(uri.toString, projection)
+        variationNodeURI.variationNode = projection
         projection
       case _ => null.asInstanceOf[T]
     }
   }
 
-  def wrapVariationNode(variationNode: VariationNode[T, L]): VariationWrapper = {
+  def wrapVariationNode[T <: VariationNode[T, L], L <: Label](variationNode: VariationNode[T, L]): VariationWrapper = {
     val buf: ListBuffer[VariationWrapper] = ListBuffer[VariationWrapper]()
     variationNode.getChildren.forEach(c => buf += wrapVariationNode(c))
-    val newNode: VariationTreeNodeWrapper[L] = VariationTreeNodeWrapper(variationNode.isRoot, variationNode.getNodeType,
-      DiffableList.from(buf.toSeq, SortType(classOf[VariationWrapper].getCanonicalName)), variationNode.getFormula, variationNode.getLabel)
-
-    uriToNode.put(newNode.uri.toString, variationNode)
-    uriToNode.put(newNode.children.uri.toString, variationNode)
+    val newNode: VariationNodeWrapper[L] = VariationNodeWrapper(variationNode.isRoot, variationNode.getNodeType,
+      DiffableList.from(buf.toSeq, SortType(classOf[VariationWrapper].getCanonicalName)), variationNode.getFormula, variationNode.getLabel, variationNode)
     newNode
   }
 
   // first attempt to apply edits from script to a copy of VariationTree before as far as possible
-  def compare(before: VariationTree[L], after: VariationTree[L]): VariationDiff[L] = {
+  def compare[T <: VariationNode[T, L], L <: Label](before: VariationTree[L], after: VariationTree[L]): VariationDiff[L] = {
     val diffnode: DiffNode[L] = DiffNode.unchanged(before.root)
     val wrappedBefore: VariationWrapper = wrapVariationNode(diffnode.projection(Time.AFTER).asInstanceOf[VariationNode[T, L]])
     val wrappedAfter: VariationWrapper = wrapVariationNode(after.root.asInstanceOf[VariationNode[T, L]])
@@ -58,7 +44,7 @@ class TrueDiffDetective[T <: VariationNode[T, L], L <: Label] {
     new VariationDiff[L](diffnode)
   }
 
-  private def applyEdit(edit: Edit): Unit = {
+  private def applyEdit[T <: VariationNode[T, L], L <: Label](edit: Edit): Unit = {
     edit match {
       case Detach(node, tag, _, _, _) =>
         val _node: T = getNodeFromURI(node)
@@ -126,7 +112,11 @@ class TrueDiffDetective[T <: VariationNode[T, L], L <: Label] {
                   val newNode: DiffNode[L] = new DiffNode[L](DiffType.ADD, NodeType.fromName(c), DiffLineNumber.Invalid(), DiffLineNumber.Invalid(),
                     lits.find(_._1.equals("formula")).getOrElse("formula" -> null)._2.asInstanceOf[org.prop4j.Node],
                     lits.find(_._1.equals("label")).get._2.asInstanceOf[L])
-                  uriToNode.put(node.toString, newNode.projection(Time.AFTER).asInstanceOf[T])
+                  node match {
+                    case value: VariationNodeURI[_, _] =>
+                      value.asInstanceOf[VariationNodeURI[L, T]].variationNode = newNode.projection(Time.AFTER).asInstanceOf[VariationNode[T, L]]
+                    case _ => ???
+                  }
                 case ListTag(_) => ???
               }
               if (listnode != null) {
@@ -134,7 +124,7 @@ class TrueDiffDetective[T <: VariationNode[T, L], L <: Label] {
               }
               kids.foreach(x => x._2 match {
                 case Left(value) => _insert(value, getNodeFromURI(node))
-                case Right(value) => getNodeFromURI(node).addChild(getNodeFromURI(value))
+                case Right(value) => getNodeFromURI[T, L](node).addChild(getNodeFromURI(value))
               })
           }
         }
@@ -165,7 +155,11 @@ class TrueDiffDetective[T <: VariationNode[T, L], L <: Label] {
               parent.removeChild(_node, Time.AFTER)
               parent.insertChild(copy, index, Time.AFTER)
             }
-            uriToNode.put(node.toString, copy.projection(Time.AFTER).asInstanceOf[T])
+            node match {
+              case value: VariationNodeURI[_, _] =>
+                value.asInstanceOf[VariationNodeURI[L, T]].variationNode = copy.projection(Time.AFTER).asInstanceOf[VariationNode[T, L]]
+              case _ => ???
+            }
             copy.addChildren(_node.getChildOrder(Time.AFTER), Time.AFTER);
           case ListTag(_) => ???
         }

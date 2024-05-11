@@ -1,5 +1,6 @@
 package org.variantsync.truediffdetective
 
+import org.variantsync.diffdetective.variation.tree.VariationNode
 import org.variantsync.diffdetective.variation.{Label, NodeType}
 import truechange._
 import truediff.{Diffable, DiffableList, Hashable}
@@ -10,9 +11,23 @@ case class JavaLitTypeOrNull(cl: Class[_]) extends LitType {
   override def accepts(value: Any): Boolean = cl.isInstance(value) || value == null
 }
 
+class VariationNodeURI[L <: Label, T <: VariationNode[T, L]](var variationNode: VariationNode[T, L]) extends URI {
+  assert(variationNode != null)
+
+  override def toString: String = variationNode.hashCode.toHexString
+}
+
 trait VariationWrapper extends Diffable
 
-case class VariationTreeNodeWrapper[L <: Label](override val _tag: Tag, children: DiffableList[VariationWrapper], formula: org.prop4j.Node, label: L) extends VariationWrapper {
+case class VariationNodeWrapper[L <: Label](override val _tag: Tag, _children: DiffableList[VariationWrapper], formula: org.prop4j.Node, label: L) extends VariationWrapper {
+  private var children: DiffableList[VariationWrapper] = org.variantsync.truediffdetective.DiffableList.withURI(_children, this.uri)
+
+  override protected def withURI(uri: URI): VariationNodeWrapper.this.type = {
+    super.withURI(uri)
+    children = org.variantsync.truediffdetective.DiffableList.withURI(_children, this.uri)
+    this
+  }
+
   override lazy val literalHash: Array[Byte] = {
     val digest = Hashable.mkDigest
     Hashable.hash(this.tag.toString, digest)
@@ -39,11 +54,11 @@ case class VariationTreeNodeWrapper[L <: Label](override val _tag: Tag, children
   override protected def directSubtrees: Iterable[Diffable] = Iterable.single(children)
 
   override protected def computeEditScriptRecurse(that: Diffable, parent: URI, parentTag: Tag, link: Link, edits: EditScriptBuffer): Diffable = that match {
-    case that: VariationTreeNodeWrapper[L] =>
+    case that: VariationNodeWrapper[L] =>
       if (this.tag == that.tag) {
         val children = this.children.computeEditScript(that.children, this.uri, this.tag, NamedLink("children"), edits).asInstanceOf[DiffableList[VariationWrapper]]
         updateOwnLiterals(that, edits)
-        VariationTreeNodeWrapper[L](tag, children, that.formula, that.label).withURI(this.uri)
+        VariationNodeWrapper[L](tag, children, that.formula, that.label).withURI(this.uri)
       }
       else null
     case _ => null
@@ -58,7 +73,7 @@ case class VariationTreeNodeWrapper[L <: Label](override val _tag: Tag, children
     // case 2: we are unassigned -> load
     val children = this.children.loadUnassigned(edits).asInstanceOf[DiffableList[VariationWrapper]]
     val childrenInsert = edits.mergeKidInsert(children.uri)
-    val newtree = VariationTreeNodeWrapper[L](tag, children, formula, label).withURI(this.uri)
+    val newtree = VariationNodeWrapper[L](tag, children, formula, label).withURI(this.uri)
     edits += InsertNode(newtree.uri, this.tag, Seq("children" -> childrenInsert), Seq("formula" -> formula, "label" -> label))
     newtree
   }
@@ -82,7 +97,8 @@ case class VariationTreeNodeWrapper[L <: Label](override val _tag: Tag, children
     }
   }
 
-  private def updateOwnLiterals(that: VariationTreeNodeWrapper[L], edits: EditScriptBuffer): Unit = {
+  private def updateOwnLiterals(that: VariationNodeWrapper[L], edits: EditScriptBuffer): Unit = {
+
     val oldbuf: ListBuffer[(String, Any)] = ListBuffer[(String, Any)]()
     val newbuf: ListBuffer[(String, Any)] = ListBuffer[(String, Any)]()
 
@@ -103,25 +119,25 @@ case class VariationTreeNodeWrapper[L <: Label](override val _tag: Tag, children
     if (this.literalHash sameElements _that.literalHash)
       this
     else {
-      val that = _that.asInstanceOf[VariationTreeNodeWrapper[L]]
+      val that = _that.asInstanceOf[VariationNodeWrapper[L]]
       updateOwnLiterals(that, edits)
       val newlist = this.children.updateLiterals(that.children, edits).asInstanceOf[DiffableList[VariationWrapper]]
-      VariationTreeNodeWrapper[L](tag, newlist, that.formula, that.label).withURI(this.uri)
+      VariationNodeWrapper[L](tag, newlist, that.formula, that.label).withURI(this.uri)
     }
   }
 }
 
-object VariationTreeNodeWrapper {
-  def apply[L <: Label](_tag: Tag, children: DiffableList[VariationWrapper], formula: org.prop4j.Node, label: L): VariationTreeNodeWrapper[L] = {
-    new VariationTreeNodeWrapper[L](_tag, children, formula, label)
+object VariationNodeWrapper {
+  def apply[L <: Label, T <: VariationNode[T, L]](_tag: Tag, children: DiffableList[VariationWrapper], formula: org.prop4j.Node, label: L, projection: VariationNode[T, L]): VariationNodeWrapper[L] = {
+    new VariationNodeWrapper[L](_tag, children, formula, label).withURI(new VariationNodeURI[L, T](projection))
   }
 
-  def apply[L <: Label](isRoot: Boolean, nodeType: NodeType, children: DiffableList[VariationWrapper], formula: org.prop4j.Node, label: L): VariationTreeNodeWrapper[L] = {
-    VariationTreeNodeWrapper[L](NamedTag(if (isRoot) "ROOT" else nodeType.toString), children, formula, label)
+  def apply[L <: Label, T <: VariationNode[T, L]](isRoot: Boolean, nodeType: NodeType, children: DiffableList[VariationWrapper], formula: org.prop4j.Node, label: L, projection: VariationNode[T, L]): VariationNodeWrapper[L] = {
+    VariationNodeWrapper[L, T](NamedTag(if (isRoot) "ROOT" else nodeType.toString), children, formula, label, projection)
   }
 
-  def apply[L <: Label](isRoot: Boolean, nodeType: NodeType, children: DiffableList[VariationWrapper], label: L): VariationTreeNodeWrapper[L] = {
+  def apply[L <: Label, T <: VariationNode[T, L]](isRoot: Boolean, nodeType: NodeType, children: DiffableList[VariationWrapper], label: L, projection: VariationNode[T, L]): VariationNodeWrapper[L] = {
     require(!isRoot || nodeType == NodeType.ARTIFACT || nodeType == NodeType.ELSE)
-    VariationTreeNodeWrapper[L](isRoot, nodeType, children, null, label)
+    VariationNodeWrapper[L, T](isRoot, nodeType, children, null, label, projection)
   }
 }
