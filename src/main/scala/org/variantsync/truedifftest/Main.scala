@@ -62,22 +62,22 @@ object Main {
     }
     {
       println("VariationNodeTreeWrapper: ")
-      val d = VariationDiff.fromFile(Path.of("resources/test.diff"), VariationDiffParseOptions.Default)
-      val before = d.project(Time.BEFORE)
-      val after = d.project(Time.AFTER)
+      val diff = VariationDiff.fromFile(Path.of("resources/test.diff"), VariationDiffParseOptions.Default)
+      val before = diff.project(Time.BEFORE)
+      val after = diff.project(Time.AFTER)
       compareAndPrintEditScript(
-        TrueDiffDetective.wrapVariationTreeNode(before.root()),
-        TrueDiffDetective.wrapVariationTreeNode(after.root()),
+        TrueDiffDetective.wrapVariationNode(before.root()),
+        TrueDiffDetective.wrapVariationNode(after.root()),
       )
     }
     {
-      println("apply edits to VariationTree")
-      val d = VariationDiff.fromFile(Path.of("resources/test.diff"), VariationDiffParseOptions.Default)
-      val before = d.project(Time.BEFORE)
-      val after = d.project(Time.AFTER)
+      println("apply edits to VariationTree (using VariationTreeNode)")
+      val diff = VariationDiff.fromFile(Path.of("resources/test.diff"), VariationDiffParseOptions.Default)
+      val before = diff.project(Time.BEFORE)
+      val after = diff.project(Time.AFTER)
 
       val result = TrueDiffDetective.compare(before, after)
-      GameEngine.showAndAwaitAll(Show.tree(before, "before"), Show.tree(after, "after"), Show.tree(result, "before with applied edits"))
+      GameEngine.showAndAwaitAll(Show.tree(before, "before"), Show.tree(after, "after"), Show.diff(result, "diff from TrueDiffDetective"))
     }
   }
 }
