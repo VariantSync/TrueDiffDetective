@@ -1,8 +1,8 @@
 package org.variantsync.truediffdetective
 
 import org.apache.commons.collections4.trie
-import org.variantsync.diffdetective.util.LineRange
-import org.variantsync.diffdetective.variation.diff.{DiffNode, Projection, Time, VariationDiff}
+import org.variantsync.diffdetective.diff.text.DiffLineNumber
+import org.variantsync.diffdetective.variation.diff._
 import org.variantsync.diffdetective.variation.tree.{VariationNode, VariationTree, VariationTreeNode}
 import org.variantsync.diffdetective.variation.{Label, NodeType}
 import truechange._
@@ -103,13 +103,17 @@ class TrueDiffDetective[T <: VariationNode[T, L], L <: Label] {
               if (_node.getParent != null) {
                 _node.getParent.removeChild(_node)
               }
+              _node match {
+                case projection: Projection[_] => projection.asInstanceOf[Projection[L]].getBackingNode.diffType = DiffType.REM
+                case _ => ???
+              }
           }
         }
 
         _remove(remove)
 
       case insert: Insert =>
-        def _insert(insert: Insert, listnode: VariationNode[T, L]): Unit = {
+        def _insert(insert: Insert, listnode: T): Unit = {
           insert match {
             case InsertList(_, _, list, _) =>
               list.foreach {
@@ -119,11 +123,10 @@ class TrueDiffDetective[T <: VariationNode[T, L], L <: Label] {
             case InsertNode(node, tag, kids, lits) =>
               tag match {
                 case NamedTag(c) =>
-                  val newNode: T = new VariationTreeNode[L](NodeType.fromName(c),
+                  val newNode: DiffNode[L] = new DiffNode[L](DiffType.ADD, NodeType.fromName(c), DiffLineNumber.Invalid(), DiffLineNumber.Invalid(),
                     lits.find(_._1.equals("formula")).getOrElse("formula" -> null)._2.asInstanceOf[org.prop4j.Node],
-                    LineRange.Invalid(), // for now: every new inserted node is assigned an invalid LineRange (because we do not take care of LineRange yet)
-                    lits.find(_._1.equals("label")).get._2.asInstanceOf[L]).asInstanceOf[T]
-                  uriToNode.put(node.toString, newNode)
+                    lits.find(_._1.equals("label")).get._2.asInstanceOf[L])
+                  uriToNode.put(node.toString, newNode.projection(Time.AFTER).asInstanceOf[T])
                 case ListTag(_) => ???
               }
               if (listnode != null) {
@@ -136,28 +139,34 @@ class TrueDiffDetective[T <: VariationNode[T, L], L <: Label] {
           }
         }
 
-        _insert(insert, null)
+        _insert(insert, null.asInstanceOf[T])
 
       case Update(node, tag, _, newlits) =>
         tag match {
-          case NamedTag(c) => c match {
-            case s if s.endsWith("IF") | s.endsWith("ELIF") =>
-              // !!! there is no setFormula method on VariationNode available (the changes are currently only visible in the labels or using Projection)
-              uriToNode.get(node.toString) match {
-                case projection: Projection[_] => projection.asInstanceOf[Projection[L]].getBackingNode.setLabel(newlits.find(_._1.equals("label")).get._2.asInstanceOf[L])
-                  projection.getBackingNode.setFormula(newlits.find(_._1.equals("formula")).get._2.asInstanceOf[org.prop4j.Node])
-                case node: VariationTreeNode[_] => node.asInstanceOf[VariationTreeNode[L]].setLabel(newlits.find(_._1.equals("label")).get._2.asInstanceOf[L])
-                case _ => ???
-              }
-            case s if s.endsWith("ARTIFACT") | s.endsWith("ELSE") =>
-              // !!! there is no setFormula method on VariationNode available (the changes are currently only visible in the labels or using Projection)
-              uriToNode.get(node.toString) match {
-                case projection: Projection[_] => projection.asInstanceOf[Projection[L]].getBackingNode.setLabel(newlits.find(_._1.equals("label")).get._2.asInstanceOf[L])
-                case node: VariationTreeNode[_] => node.asInstanceOf[VariationTreeNode[L]].setLabel(newlits.find(_._1.equals("label")).get._2.asInstanceOf[L])
-                case _ => ???
-              }
-            case _ => ;
-          }
+          case NamedTag(_) =>
+            val _node: DiffNode[L] = getNodeFromURI(node).asInstanceOf[VariationNode[T, L]] match {
+              case projection: Projection[_] => projection.asInstanceOf[Projection[L]].getBackingNode
+              case _ => ???
+            }
+            val parent = _node.getParent(Time.AFTER)
+            val copy = _node.shallowCopy()
+            copy.diffType = DiffType.ADD
+            _node.diffType = DiffType.REM
+            newlits.find(_._1.equals("formula")) match {
+              case Some((_, formula)) => copy.setFormula(formula.asInstanceOf[org.prop4j.Node])
+              case None => ;
+            }
+            newlits.find(_._1.equals("label")) match {
+              case Some((_, formula)) => copy.setLabel(formula.asInstanceOf[L])
+              case None => ;
+            }
+            if (parent != null) {
+              val index = parent.indexOfChild(_node, Time.AFTER)
+              parent.removeChild(_node, Time.AFTER)
+              parent.insertChild(copy, index, Time.AFTER)
+            }
+            uriToNode.put(node.toString, copy.projection(Time.AFTER).asInstanceOf[T])
+            copy.addChildren(_node.getChildOrder(Time.AFTER), Time.AFTER);
           case ListTag(_) => ???
         }
     }
