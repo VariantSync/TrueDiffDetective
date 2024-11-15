@@ -16,8 +16,10 @@ To install DiffDetective using Maven:
 ```shell
     git clone https://github.com/VariantSync/DiffDetective.git
     cd DiffDetective
-    mvn install
+    mvn clean install
 ```
+Be sure to actually (re-)compile DiffDetective with version 17 of Java.
+In case of doubt or obscure errors later on, try removing the maven cache with `rm -rf ~/.m2` before installing DiffDetective.
     
 To install truediff using sbt:
 ```shell
