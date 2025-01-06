@@ -35,9 +35,9 @@ stdenvNoCC.mkDerivation {
     # (multiple issues, stack overflow etc., who mentioned this command along the way, but there is no actually useful documentation what that command should do),
     # `sbt update` should be enough to download all necessary dependencies to build offline.
     # However, it doesn't. Hence, we have to also do a fake compilation.
-    # In order to actually cache all depencies [1] without build artifacts
+    # In order to actually cache all dependencies [1] without build artifacts
     # (this could cause annoying reproducibility bugs caused by previous build outputs),
-    # we only add an empty file such that `sbt` "builds" without complains.
+    # we only add an empty file such that `sbt` "builds" without complaints.
     #
     # [1]: https://stackoverflow.com/questions/52355642/sbt-compile-compiler-bridge#comment107617368_52430243
     buildPhase = ''
@@ -47,7 +47,7 @@ stdenvNoCC.mkDerivation {
       source_directories=($(find . -path "*/src/main/scala"))
 
       # Delete all files except `build.sbt` and the `project/` directory to keep
-      # dependency fetching independet of other source changes.
+      # dependency fetching independent of other source changes.
       find . -mindepth 1 -maxdepth 1 -not \( -name "build.sbt" -o -name "project" \) -exec rm -r {} +
 
       # Add an empty file into each source directory such that sbt actually
