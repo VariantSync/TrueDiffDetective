@@ -1,6 +1,7 @@
 name := "TrueDiffDetective"
 
 ThisBuild / organization := "org.variantsync"
+// The version is duplicated in `default.nix`.
 ThisBuild / version := "0.1.0-SNAPSHOT"
 
 ThisBuild / scalaVersion := "2.13.1"
